@@ -6,6 +6,7 @@
 
 import os
 
+from functions import *
 import dask.dataframe as dd
 import numpy as np
 from dask.diagnostics import ProgressBar
@@ -13,6 +14,7 @@ from dask.array import stats as dask_stats
 from matplotlib import pyplot as plt
 from datetime import datetime
 from sklearn.impute import KNNImputer
+
 
 # Datatype scheme
 
@@ -138,6 +140,27 @@ df = df.assign(original_language=original_language_masked)
 # (value calculated every different day by TMBD based on a unknown algorithm)
 df = df.drop(columns=['popularity'])
 
+# Convert str/Json columns to tuples -> genres, spoken_languages, production_companies, production_countries
+
+# genres
+genres_parsed = df['genres'].apply(lambda x: str_to_list(x, 'name'), meta=object)
+df = df.drop(columns=['genres'])
+df = df.assign(genres=genres_parsed)
+
+# spoken_languages
+spoken_languages_parsed = df['spoken_languages'].apply(lambda x: str_to_list(x, 'iso_639_1'), meta=object)
+df = df.drop(columns=['spoken_languages'])
+df = df.assign(spoken_languages=spoken_languages_parsed)
+
+# production_companies
+production_companies_parsed = df['production_companies'].apply(lambda x: str_to_list(x, 'name'), meta=object)
+df = df.drop(columns=['production_companies'])
+df = df.assign(production_companies=production_companies_parsed)
+
+# production_countries
+production_countries_parsed = df['production_countries'].apply(lambda x: str_to_list(x, 'name'), meta=object)
+df = df.drop(columns=['production_countries'])
+df = df.assign(production_countries=production_countries_parsed)
 
 # Resume of cleaning data process
 print("DataFrame (new) colums: ")  # 4792 (antes 4803)
@@ -166,14 +189,14 @@ print(df['budget'].describe().compute())
 #print("maximum: " + str(df['budget'].max().compute()))
 print("skewness: " + str(float(dask_stats.skew(df['budget'].values).compute())))
 
-# Popularity
-print("\nPOPULARITY: ")
-print(df['popularity'].describe().compute())
-#print("mean: " + str(df['popularity'].mean().compute()))
-#print("std: " + str(df['popularity'].std().compute()))
-#print("minimum: " + str(df['popularity'].min().compute()))
-#print("maximum: " + str(df['popularity'].max().compute()))
-print("skewness: " + str(float(dask_stats.skew(df['popularity'].values).compute())))
+# # Popularity
+# print("\nPOPULARITY: ")
+# print(df['popularity'].describe().compute())
+# #print("mean: " + str(df['popularity'].mean().compute()))
+# #print("std: " + str(df['popularity'].std().compute()))
+# #print("minimum: " + str(df['popularity'].min().compute()))
+# #print("maximum: " + str(df['popularity'].max().compute()))
+# print("skewness: " + str(float(dask_stats.skew(df['popularity'].values).compute())))
 
 # Revenue
 print("\nREVENUE: ")
@@ -213,6 +236,15 @@ print("skewness: " + str(float(dask_stats.skew(df['vote_count'].values).compute(
 
 #df_test = df[(df.original_titlec== "Diamond Ruff")]
 #print(df_test.runtime.head())
+
+# values count
+for i in (['budget', 'genres', 'original_language', 'original_title',
+           'production_companies', 'production_countries',
+           'release_date', 'revenue', 'runtime', 'spoken_languages',
+           'vote_average', 'vote_count']):
+    values = df[i].value_counts().compute()
+    print(values)
+
 
 # String object columns: original_title, original_language
 
