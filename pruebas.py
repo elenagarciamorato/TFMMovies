@@ -7,6 +7,7 @@
 import os
 
 import dask.dataframe as dd
+import dask.array as da
 import numpy as np
 from dask.diagnostics import ProgressBar
 from dask.array import stats as dask_stats
@@ -15,7 +16,7 @@ from datetime import datetime
 from sklearn.impute import KNNImputer
 import json
 from collections import defaultdict
-
+from functions import *
 # Datatype scheme
 
 dtype_scheme ={'budget': np.int64, 'genres': np.object, 'homepage': np.str, 'id': np.int64, 'keywords': np.object,
@@ -61,15 +62,18 @@ print(str(res['name']))
 # dfx = dfx.drop('production_countries', axis=1)
 # dfx = dfx.assign(production_countries=production_countries_masked)
 
-def my_function(x):
-    prod = json.loads(x)
-    nis = defaultdict(list)
-    {nis[key].append(sub[key]) for sub in prod for key in sub}
-    #print(str(nis['name']))
-    return nis['name']
+# def str_to_list(x, k):
+#     obj = json.loads(x)
+#     dictionary = defaultdict(list)
+#     {dictionary[key].append(sub[key]) for sub in obj for key in sub}
+#     #print(str(dictionary['name']))
+#     return dictionary[k]
 
 
-production_countries_parsed = dfx['production_countries'].apply(lambda x: my_function(x), meta=list)
+production_countries_parsed = dfx['production_countries'].apply(lambda x: str_to_list(x, 'name'), meta=object)
 dfx = dfx.drop(columns=['production_countries'])
 dfx = dfx.assign(production_countries=production_countries_parsed)
-print(dfx['production_countries'].head())
+
+print(dfx['production_countries'].head(20))
+values = dfx['production_countries'].value_counts().compute()
+print(values)
