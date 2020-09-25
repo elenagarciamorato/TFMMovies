@@ -1,3 +1,9 @@
+# TRABAJO DE FIN DE MÁSTER - TFMMovies
+# Elena Garcia-Morato Piñan
+# MASTER EN INGENIERÍA EN SISTEMAS DE DECISIÓN
+# UNIVERSIDAD REY JUAN CARLOS
+# CURSO 2019/2020
+
 import os
 
 import dask.dataframe as dd
@@ -6,8 +12,9 @@ from dask.diagnostics import ProgressBar
 from dask.array import stats as dask_stats
 from matplotlib import pyplot as plt
 from datetime import datetime
+from sklearn.impute import KNNImputer
 
-# Esquema tipo de datos
+# Datatype scheme
 
 dtype_scheme ={'budget': np.int64, 'genres': np.object, 'homepage': np.str, 'id': np.int64, 'keywords': np.object,
                'original_language': np.str, 'original_title': np.str, 'overview': np.str, 'popularity': np.float64,
@@ -22,7 +29,7 @@ df = dd.read_csv('tmdb_5000_movies.csv', dtype=dtype_scheme)
 #df = df.set_index('original_title')
 print(df)
 
-######## LIMPIEZA DE DATOS #########
+######## DATA CLEANING #########
 # columns and number of rows
 print("DataFrame columns: ")
 print(df.columns)
@@ -69,43 +76,85 @@ for i in (['budget', 'genres', 'id', 'keywords', 'original_language', 'original_
 # and 'keywords' - (4220) (despite their high level of unique values, we keep original-title as key value of each film)
 df = df.drop(columns=['tagline', 'id', 'overview', 'title', 'keywords'])
 
-# Drop rows whose status is not "Released" because only 3 of them are different,
+# Drop rows whose status is not "Released" because we don't care about not released films (8),
 # and then drop the status column because it doesn't make sense
 df = df[(df.status == "Released")]
 df = df.drop(columns=['status'])
 
+
 # Odd Values
 
-# Drop rows with budget == 0, runtime ==0
-df = df[(df.budget != 0) & (df.runtime != 0)]
+
+# Value 0 in columns 'budget', 'revenue' and 'runtime' doesn't mean anything but missed values
+# To fix it, on budget, revenue and runtime (int64) we set the 0 values as NaN
+condition = df['budget'] == 0
+budget_masked = df['budget'].mask(condition, np.nan)
+df = df.drop('budget', axis=1)
+df = df.assign(budget=budget_masked)
+
+condition = df['revenue'] == 0
+revenue_masked = df['revenue'].mask(condition, np.nan)
+df = df.drop('revenue', axis=1)
+df = df.assign(revenue=revenue_masked)
+
+condition = df['runtime'] == 0
+runtime_masked = df['runtime'].mask(condition, np.nan)
+df = df.drop('runtime', axis=1)
+df = df.assign(runtime=runtime_masked)
+
+# Furthermore, on runtime we infer the value based on the median
+median = (df['runtime'].quantile(0.5)).compute()
+# print(" The median is: " + str(median))
+df = df.fillna({'runtime': float(median)})
+
+# Furthermore, on runtime we infer the value based on the neighbor method
+# Imputed values only based in ['budget', 'popularity', 'revenue', 'runtime', 'vote average', 'vote count']
+# df_aux = df.drop(columns= ['genres', 'spoken_languages', 'production_companies', 'production_countries', 'original_title', 'original_language', 'release_date'])
+# imputer = KNNImputer(n_neighbors=3, weights="uniform")
+# df_filled = imputer.fit_transform(df_aux)
+# No es posible imputar valores con KNN, dado que el dtaframe a imputar no puede contener variables no numericas
+# y ademas se devuelve un array
 
 
 
 # OTHER
 
-# Parse object into date -> Colums release_date
+# Parse object into date -> release_date
 #print(df['release_date'].value_counts().compute())
 release_date_parsed = df['release_date'].apply(lambda x: datetime.strptime(x, "%Y-%m-%d"), meta=datetime)
 df = df.drop(columns=['release_date'])
 df = df.assign(release_date=release_date_parsed)
 #print(df['release_date'].head())
 
-print("DataFrame (new) colums: ")  # 4800 (antes 4803)
+# Reduce the number of different values by putting unique entries in a category called other -> original language
+count_original_languages = df['original_language'].value_counts().compute()
+single_language = list(count_original_languages[count_original_languages == 1].index)
+condition = df['original_language'].isin(single_language)
+original_language_masked = df['original_language'].mask(condition, 'other')
+df = df.drop('original_language', axis=1)
+df = df.assign(original_language=original_language_masked)
+
+# Drop the column 'popularity' because doesn't propose relevant information
+# (value calculated every different day by TMBD based on a unknown algorithm)
+df = df.drop(columns=['popularity'])
+
+
+# Resume of cleaning data process
+print("DataFrame (new) colums: ")  # 4792 (antes 4803)
 print(df.columns)
-print("DataFrame rows (new number of): " + str(len(df)))  # 14 (antes 20)
+print("DataFrame rows (new number of): " + str(len(df)))  # 13 (antes 20)
 
 ## Homepage(pagina web) -> muchos nulos
 ## tagline(slogan) (3944), id (4800), overview (sinopsis) (4799), title (4797) son casitodo valores unicos que no aportan info
-## keywords -> no existe en el otro db y muchos valores unicos (4220) , ¿lo eliminamos?
-##     status -> (released, rumored (5), post-production (3)) ¿Quitamos las q no estan released?y eliminamos esta columna?)
-## ¿QUE HACEMOS CON POPULARITY??
+## keywords -> no existe en el otro db y muchos valores unicos (4220)
+## status -> (released, rumored (5), post-production (3)) Quitamos las q no estan released y eliminamos esta columna
+## popularity -> popularidad de una pelicula en el momento de la extracción calculada por TMDB en base a un algoritmo no descrito
 
 
-# DESCRIPTIVE STATISTICS
 
-print(df)
+#### DESCRIPTIVE STATISTICS ####
 
-
+#print(df)
 # Numeric value columns: budget, popularity, revenue, runtime, vote average, vote count
 
 # Budget
@@ -162,10 +211,12 @@ print(df['vote_count'].describe().compute())
 #print("maximum: " + str(df['vote_count'].max().compute()))
 print("skewness: " + str(float(dask_stats.skew(df['vote_count'].values).compute())))
 
+#df_test = df[(df.original_titlec== "Diamond Ruff")]
+#print(df_test.runtime.head())
 
-# String object columns: original_title
+# String object columns: original_title, original_language
 
 
 # Date type columns: release_date
 
-# Columnas con objetos JSON: genres, original_language, spoken_languages, production_companies, production_countries
+# JSON object columns: genres, spoken_languages, production_companies, production_countries
