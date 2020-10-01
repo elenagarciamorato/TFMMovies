@@ -18,7 +18,7 @@ from sklearn.impute import KNNImputer
 import json
 from collections import defaultdict
 
-def str_to_list(x, k):
+def str_to_tuple(x, k):
     obj = json.loads(x)
     dictionary = defaultdict(list)
     {dictionary[key].append(sub[key]) for sub in obj for key in sub}
