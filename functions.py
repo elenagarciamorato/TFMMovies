@@ -18,14 +18,61 @@ from sklearn.impute import KNNImputer
 import json
 from collections import defaultdict
 
-def str_to_tuple(x, k):
-    obj = json.loads(x)
-    dictionary = defaultdict(list)
-    {dictionary[key].append(sub[key]) for sub in obj for key in sub}
-    #print(str(dictionary['name']))
-    #print(type(dictionary[k]))
-    #out = np.array(dictionary[k])
-    #out = da.asarray(out)
-    out = tuple(dictionary[k])
-    #print(out)
+
+def get_list(x, k):
+
+    if str(x) == "nan":
+        out = "[]"
+    else:
+        # x = str(x).replace('\\', '')
+        # x = str(x).replace('\"', '\'')
+        # x = str(x).replace('\'name\': \'\'', '\'name\': \'Unknown\'')
+        # x = str(x).replace('{\'', '{\"')
+        # x = str(x).replace('\'}', '\"}')
+        # x = str(x).replace('\', \'', '\", \"')
+        # x = str(x).replace(', \'', ', \"')
+        # x = str(x).replace('\': \'', '\": \"')
+        # x = str(x).replace('\': ', '\": ')
+        # x = str(x).replace('\"\"', '\"')
+
+        mapping = {'\\': '', '\"': '\'', '\'name\': \'\'': '\'name\': \'Unknown\'', '{\'': '{\"', '\'}': '\"}',
+                   '\', \'': '\", \"', ', \'': ', \"', '\': \'':  '\": \"', '\': ': '\": ', '\"\"': '\"'}
+
+        for i, j in mapping.items():
+            x = x.replace(i, j)
+
+        obj = json.loads(x, strict=False)
+        dictionary = defaultdict(list)
+        {dictionary[key].append(sub[key]) for sub in obj for key in sub}
+        #print(str(dictionary['name']))
+        #print(type(dictionary[k]))
+        #out = np.array(dictionary[k])
+        #out = da.asarray(out)
+        out = tuple(dictionary[k])
+
     return out
+
+
+def get_object(x, key):
+
+    if str(x) == "nan":
+        out = ""
+    else:
+        mapping = {'\\': '', '\"': '\'', '\'name\': \'\'': '\'name\': \'Unknown\'', 'None': '\'Unknown\'',
+                   '{\'': '{\"', '\'}': '\"}','\', \'': '\", \"', ', \'': ', \"', '\': \'':  '\": \"', '\': ': '\": ',
+                   '\"\"': '\"'}
+
+        for i, j in mapping.items():
+            x = x.replace(i, j)
+
+        obj = json.loads(x, strict=False)
+        out = str(obj[key])
+
+    return out
+
+def to_float(x):
+
+    if x.isnumeric():
+        return np.float(x)
+    else:
+        return np.nan

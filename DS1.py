@@ -79,11 +79,6 @@ for i in (['budget', 'genres', 'id', 'keywords', 'original_language', 'original_
 # and 'keywords' - (4220) (despite their high level of unique values, we keep original-title as key value of each film)
 df = df.drop(columns=['tagline', 'id', 'overview', 'title', 'keywords'])
 
-# Drop rows whose status is not "Released" because we don't care about not released films (8),
-# and then drop the status column because it doesn't make sense
-df = df[(df.status == "Released")]
-df = df.drop(columns=['status'])
-
 
 # Odd Values
 
@@ -137,6 +132,11 @@ original_language_masked = df['original_language'].mask(condition, 'other')
 df = df.drop('original_language', axis=1)
 df = df.assign(original_language=original_language_masked)
 
+# Drop rows whose status is not "Released" because we don't care about not released films (8),
+# and then drop the status column because it doesn't make sense
+df = df[(df.status == "Released")]
+df = df.drop(columns=['status'])
+
 # Drop the column 'popularity' because doesn't propose relevant information
 # (value calculated every different day by TMBD based on a unknown algorithm)
 df = df.drop(columns=['popularity'])
@@ -144,29 +144,29 @@ df = df.drop(columns=['popularity'])
 # Convert str/Json columns to tuples -> genres, spoken_languages, production_companies, production_countries
 
 # genres
-genres_parsed = df['genres'].apply(lambda x: str_to_tuple(x, 'name'), meta=object)
+genres_parsed = df['genres'].apply(lambda x: get_list(x, 'name'), meta=object)
 df = df.drop(columns=['genres'])
 df = df.assign(genres=genres_parsed)
 
 # spoken_languages
-spoken_languages_parsed = df['spoken_languages'].apply(lambda x: str_to_tuple(x, 'iso_639_1'), meta=object)
+spoken_languages_parsed = df['spoken_languages'].apply(lambda x: get_list(x, 'iso_639_1'), meta=object)
 df = df.drop(columns=['spoken_languages'])
 df = df.assign(spoken_languages=spoken_languages_parsed)
 
 # production_companies
-production_companies_parsed = df['production_companies'].apply(lambda x: str_to_tuple(x, 'name'), meta=object)
+production_companies_parsed = df['production_companies'].apply(lambda x: get_list(x, 'name'), meta=object)
 df = df.drop(columns=['production_companies'])
 df = df.assign(production_companies=production_companies_parsed)
 
 # production_countries
-production_countries_parsed = df['production_countries'].apply(lambda x: str_to_tuple(x, 'name'), meta=object)
+production_countries_parsed = df['production_countries'].apply(lambda x: get_list(x, 'name'), meta=object)
 df = df.drop(columns=['production_countries'])
 df = df.assign(production_countries=production_countries_parsed)
 
 # Resume of cleaning data process
-print("DataFrame (new) colums: ")  # 4792 (antes 4803)
+print("DataFrame (new) colums: ")   # 12 (antes 20)
 print(df.columns)
-print("DataFrame rows (new number of): " + str(len(df)))  # 13 (antes 20)
+print("DataFrame rows (new number of): " + str(len(df)))  # 4792 (antes 4803)
 
 ## Homepage(pagina web) -> muchos nulos
 ## tagline(slogan) (3944), id (4800), overview (sinopsis) (4799), title (4797) son casitodo valores unicos que no aportan info
@@ -179,60 +179,32 @@ print("DataFrame rows (new number of): " + str(len(df)))  # 13 (antes 20)
 #### DESCRIPTIVE STATISTICS ####
 
 #print(df)
-# Numeric value columns: budget, popularity, revenue, runtime, vote average, vote count
+# Numeric value columns: budget, revenue, runtime, vote average, vote count
 
 # Budget
 print("\nBUDGET: ")
 print(df['budget'].describe().compute())
-#print("mean: " + str(df['budget'].mean().compute()))
-#print("std: " + str(df['budget'].std().compute()))
-#print("minimum: " + str(df['budget'].min().compute()))
-#print("maximum: " + str(df['budget'].max().compute()))
 print("skewness: " + str(float(dask_stats.skew(df['budget'].values).compute())))
 
-# # Popularity
-# print("\nPOPULARITY: ")
-# print(df['popularity'].describe().compute())
-# #print("mean: " + str(df['popularity'].mean().compute()))
-# #print("std: " + str(df['popularity'].std().compute()))
-# #print("minimum: " + str(df['popularity'].min().compute()))
-# #print("maximum: " + str(df['popularity'].max().compute()))
-# print("skewness: " + str(float(dask_stats.skew(df['popularity'].values).compute())))
 
 # Revenue
 print("\nREVENUE: ")
 print(df['revenue'].describe().compute())
-#print("mean: " + str(df['revenue'].mean().compute()))
-#print("std: " + str(df['revenue'].std().compute()))
-#print("minimum: " + str(df['revenue'].min().compute()))
-#print("maximum: " + str(df['revenue'].max().compute()))
 print("skewness: " + str(float(dask_stats.skew(df['revenue'].values).compute())))
 
 # Runtime
 print("\nRUNTIME: ")
 print(df['runtime'].describe().compute())
-#print("mean: " + str(df['runtime'].mean().compute()))
-#print("std: " + str(df['runtime'].std().compute()))
-#print("minimum: " + str(df['runtime'].min().compute()))
-#print("maximum: " + str(df['runtime'].max().compute()))
 print("skewness: " + str(float(dask_stats.skew(df['runtime'].values).compute())))
 
 # Vote Average
 print("\nVOTE AVERAGE: ")
 print(df['vote_average'].describe().compute())
-#print("mean: " + str(df['vote_average'].mean().compute()))
-#print("std: " + str(df['vote_average'].std().compute()))
-#print("minimum: " + str(df['vote_average'].min().compute()))
-#print("maximum: " + str(df['vote_average'].max().compute()))
 print("skewness: " + str(float(dask_stats.skew(df['vote_average'].values).compute())))
 
 # Vote Count
 print("\nVOTE COUNT: ")
 print(df['vote_count'].describe().compute())
-#print("mean: " + str(df['vote_count'].mean().compute()))
-#print("std: " + str(df['vote_count'].std().compute()))
-#print("minimum: " + str(df['vote_count'].min().compute()))
-#print("maximum: " + str(df['vote_count'].max().compute()))
 print("skewness: " + str(float(dask_stats.skew(df['vote_count'].values).compute())))
 
 #df_test = df[(df.original_titlec== "Diamond Ruff")]
@@ -248,7 +220,11 @@ print("skewness: " + str(float(dask_stats.skew(df['vote_count'].values).compute(
 
 
 # String object columns: original_title, original_language
+print("\nORIGINAL LANGUAGE: ")
+print(df['original_language'].describe().compute())
 
+print("\nORIGINAL TITLE: ")
+print(df['original_title'].describe().compute())
 
 # Date type columns: release_date
 
