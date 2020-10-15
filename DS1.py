@@ -18,12 +18,11 @@ from sklearn.impute import KNNImputer
 
 
 # Datatype scheme
-
-dtype_scheme ={'budget': np.int64, 'genres': np.object, 'homepage': np.str, 'id': np.int64, 'keywords': np.object,
+dtype_scheme ={'budget': np.float64, 'genres': np.object, 'homepage': np.str, 'id': np.float64, 'keywords': np.object,
                'original_language': np.str, 'original_title': np.str, 'overview': np.str, 'popularity': np.float64,
                'production_companies': np.object, 'production_countries': np.object, 'release_date': np.object,
-               'revenue': np.int64, 'runtime': np.float64, 'spoken_languages': np.object,  'status': np.object,
-               'tagline': np.str, 'title': np.str, 'vote_average': np.float64, 'vote_count': np.int64}
+               'revenue': np.float64, 'runtime': np.float64, 'spoken_languages': np.object,  'status': np.object,
+               'tagline': np.str, 'title': np.str, 'vote_average': np.float64, 'vote_count': np.float64}
 
 # Change your working directory to where the data resides
 os.chdir('/Users/elenagarciamorato/Desktop/TFM')
@@ -33,9 +32,9 @@ df = dd.read_csv('tmdb_5000_movies.csv', dtype=dtype_scheme)
 print(df)
 
 ######## DATA CLEANING #########
+
 # columns and number of rows
-print("DataFrame columns: ")
-print(df.columns)
+print("DataFrame columns: " + str(df.columns))
 print("DataFrame rows (number of): " + str(len(df)))
 
 # NULL VALUES
@@ -52,15 +51,15 @@ print(missing_count_pct)
 #print(df.head())
 
 # Drop not relevant columns and with high number of null values (+50%) -> homepage
-#df = df.drop(columns=['tagline', 'homepage', 'id', 'overview', 'title', 'keywords'])
-df = df.drop(columns=['homepage'])
-print(df.columns)
+columns_to_drop = list(missing_count_pct[missing_count_pct >= 50].index)
+df = df.drop(columns_to_drop, axis=1)
 
 # Fill missed values with a default one (between 5% and 50% null values)
 #df = df.fillna({'release_date': 'Dismissed', 'runtime': 'Dismissed'})
 
-# Discard rows with missing values (just in case null values were a very low number (<5%)) -> release_date and runtime
-df = df.dropna(subset=('release_date', 'runtime'))
+# Discard rows with missing values (just in case null values were a very low number (<5%)) -> release_date, runtime, overview
+rows_to_drop = list(missing_count_pct[(missing_count_pct > 0) & (missing_count_pct < 5)].index)
+df = df.dropna(subset=rows_to_drop)
 
 
 # EVALUATING VALUES
@@ -75,9 +74,10 @@ for i in (['budget', 'genres', 'id', 'keywords', 'original_language', 'original_
 
 # Unique Values
 
-# Drop columns with a high number of unique values -> 'tagline'(3944), 'id'(4800), 'overview'(4799), 'title'(4797)
-# and 'keywords' - (4220) (despite their high level of unique values, we keep original-title as key value of each film)
-df = df.drop(columns=['tagline', 'id', 'overview', 'title', 'keywords'])
+# Drop columns with a high number of unique values -> 'tagline'(3944), 'overview'(4799), 'title'(4797)
+# and 'keywords' - (4220) (despite their high level of unique values, we keep id as key value of each film
+# and original-title to identify them in inequivocous way)
+df = df.drop(columns=['tagline', 'overview', 'title', 'keywords'])
 
 
 # Odd Values
@@ -100,16 +100,21 @@ runtime_masked = df['runtime'].mask(condition, np.nan)
 df = df.drop('runtime', axis=1)
 df = df.assign(runtime=runtime_masked)
 
+# Again, we evaluate null values
+with ProgressBar():
+    missing_count_pct = ((df.isnull().sum() / df.index.size) * 100).compute()
+print(missing_count_pct)
+
 # Furthermore, on runtime we infer the value based on the median
 median = (df['runtime'].quantile(0.5)).compute()
-# print(" The median is: " + str(median))
+print(" The median is: " + str(median))
 df = df.fillna({'runtime': float(median)})
 
 # Furthermore, on runtime we infer the value based on the neighbor method
 # Imputed values only based in ['budget', 'popularity', 'revenue', 'runtime', 'vote average', 'vote count']
-# df_aux = df.drop(columns= ['genres', 'spoken_languages', 'production_companies', 'production_countries', 'original_title', 'original_language', 'release_date'])
-# imputer = KNNImputer(n_neighbors=3, weights="uniform")
-# df_filled = imputer.fit_transform(df_aux)
+#df_aux = df.drop(columns=['genres', 'spoken_languages', 'production_companies', 'production_countries', 'original_title', 'original_language', 'release_date'])
+#imputer = KNNImputer(n_neighbors=5, weights="uniform")
+#df_filled = imputer.fit_transform(df_aux)
 # No es posible imputar valores con KNN, dado que el dtaframe a imputar no puede contener variables no numericas
 # y ademas se devuelve un array
 
@@ -117,16 +122,16 @@ df = df.fillna({'runtime': float(median)})
 
 # OTHER
 
-# Parse object into date -> release_date
-#print(df['release_date'].value_counts().compute())
-release_date_parsed = df['release_date'].apply(lambda x: datetime.strptime(x, "%Y-%m-%d"), meta=datetime)
+# Parse object into date and keep only the year-> release_date
+release_year = df['release_date'].apply(lambda x: datetime.strptime(x, "%Y-%m-%d").year, meta=datetime)
 df = df.drop(columns=['release_date'])
-df = df.assign(release_date=release_date_parsed)
-#print(df['release_date'].head())
+df = df.assign(release_year=release_year)
+print(df['release_year'].head())
 
 # Reduce the number of different values (37) by putting unique entries (14) in a category called other -> original language
 count_original_languages = df['original_language'].value_counts().compute()
 single_language = list(count_original_languages[count_original_languages == 1].index)
+
 condition = df['original_language'].isin(single_language)
 original_language_masked = df['original_language'].mask(condition, 'other')
 df = df.drop('original_language', axis=1)
@@ -140,6 +145,7 @@ df = df.drop(columns=['status'])
 # Drop the column 'popularity' because doesn't propose relevant information
 # (value calculated every different day by TMBD based on a unknown algorithm)
 df = df.drop(columns=['popularity'])
+
 
 # Convert str/Json columns to tuples -> genres, spoken_languages, production_companies, production_countries
 
@@ -164,7 +170,7 @@ df = df.drop(columns=['production_countries'])
 df = df.assign(production_countries=production_countries_parsed)
 
 # Resume of cleaning data process
-print("DataFrame (new) colums: ")   # 12 (antes 20)
+print("DataFrame (new) colums: ")   # 13 (antes 20)
 print(df.columns)
 print("DataFrame rows (new number of): " + str(len(df)))  # 4792 (antes 4803)
 
@@ -180,7 +186,7 @@ print("DataFrame rows (new number of): " + str(len(df)))  # 4792 (antes 4803)
 
 #print(df)
 # Numeric value columns: budget, revenue, runtime, vote average, vote count
-
+"""
 # Budget
 print("\nBUDGET: ")
 print(df['budget'].describe().compute())
@@ -207,17 +213,6 @@ print("\nVOTE COUNT: ")
 print(df['vote_count'].describe().compute())
 print("skewness: " + str(float(dask_stats.skew(df['vote_count'].values).compute())))
 
-#df_test = df[(df.original_titlec== "Diamond Ruff")]
-#print(df_test.runtime.head())
-
-# values count
-# for i in (['budget', 'genres', 'original_language', 'original_title',
-#            'production_companies', 'production_countries',
-#            'release_date', 'revenue', 'runtime', 'spoken_languages',
-#            'vote_average', 'vote_count']):
-#     values = df[i].value_counts().compute()
-#     print(values)
-
 
 # String object columns: original_title, original_language
 print("\nORIGINAL LANGUAGE: ")
@@ -227,19 +222,20 @@ print("\nORIGINAL TITLE: ")
 print(df['original_title'].describe().compute())
 
 # Date type columns: release_date
+print("\nRELEASE YEAR: ")
+print(df['release_year'].describe().compute())
 
-# JSON object columns: genres, spoken_languages, production_companies, production_countries
+"""
 
+# SQL QUERYS
 
-# SQL Querys
-
-# Correlation between budget and revenue
-
+### Correlation between film's budget and revenue -> Exist correlation
 with ProgressBar():
     bud_and_rev = df[['budget', 'revenue']]
     correlation_matrix = bud_and_rev.corr().compute()
 print(correlation_matrix)
 
+# Representation as regplot
 seaborn.set(style="whitegrid")
 f, ax = plt.subplots(figsize=(10, 10))
 seaborn.despine(f, left=True, bottom=True)
@@ -250,6 +246,85 @@ plt.ylim(ymin=0)
 plt.xlim(xmin=0)
 #plt.ylim(ymax=1000000000)
 #plt.xlim(xmax=1000000000)
+#plt.show()
+
+
+### 10 Films with lowest budget within the 200 with highest vote_average
+#query1 = (df.nsmallest(100, 'budget')).nlargest(10, 'vote_average')
+query1 = df.nlargest(200, 'vote_average').nsmallest(10, 'budget')
+print(str(query1[['vote_average', 'budget', 'original_title']].head(10)))
+
+# Evaluates correlation -> Not correlation
+with ProgressBar():
+    bud_and_vote_av = df[['budget', 'vote_average']]
+    correlation_matrix = bud_and_vote_av.corr().compute()
+print(correlation_matrix)
+
+
+# 10 oldest films whose original_language is spanish
+query2 = df[df.original_language == 'es'].nsmallest(10, 'release_year')
+print(str(query2[['release_year', 'original_title']].head(10)))
+
+# Representation as scatterplot
+query2 = df[df.original_language == 'es'].groupby('release_year')
+count_per_year = query2['id'].count().compute()
+
+#seaborn.set(style="whitegrid")
+#f, ax = plt.subplots(figsize=(10, 10))
+#seaborn.despine(f, left=True, bottom=True)
+#seaborn.scatterplot(data=count_per_year.compute())
+#seaborn.histplot(count_per_year.index)
+seaborn.displot(data=count_per_year, x=count_per_year.index)
+#plt.show()
+
+# 10 Most voted films with higher vote_average
+query4 = df.nlargest(10, ['vote_count', 'vote_average'])
+print(str(query4[['vote_count', 'vote_average', 'original_title']].head(10)))
+#query1 = df.nlargest(45000, 'vote_average').nsmallest(15, 'budget')
+#query3 = df.nsmallest(45000, 'vote_average')
+
+# Representation as
+
+# 25 Films with lowest vote_average within the 200 most voted films
+query3 = df.nlargest(200, 'vote_count').nsmallest(25, 'vote_average')
+print(str(query3[['vote_count', 'vote_average', 'original_title']].head(15)))
+
+# 5 Years with more released films
+query4 = df.groupby('release_year')
+count_per_year = query4['id'].count().compute()
+query4 = count_per_year.nlargest(5)
+print(query4.head())
+
+# 5 Most popular genres
+query5 = df.explode('genres')
+query5 = query5.groupby('genres')
+count_per_genre = query5['id'].count().compute()
+query5 = count_per_genre.nlargest(5)
+print(query5.head())
+
+# Films by released_year/genre and by revenue/genre
+query6 = df.explode('genres')
+row_filter = query6['genres'].isin(['Drama', 'Comedy', 'Thriller', 'Action', 'Romance'])
+
+# Representation released_year/genre
+column_filter = ['release_year', 'genres']
+ages_and_genres = query6[row_filter][column_filter].compute()
+
+seaborn.set(style="whitegrid")
+f, ax = plt.subplots(figsize=(10, 10))
+seaborn.despine(f, left=True, bottom=True)
+group_order = ["Drama", "Comedy", "Thriller", "Action", "Romance"]
+seaborn.violinplot(x="genres", y="release_year", data=ages_and_genres, ax=ax)
 plt.show()
 
+#Representation revenue/genre
+column_filter = ['revenue', 'genres']
+revenue_and_genres = query6[row_filter][column_filter].compute()
+
+seaborn.set(style="whitegrid")
+f, ax = plt.subplots(figsize=(10, 10))
+seaborn.despine(f, left=True, bottom=True)
+group_order = ["Drama", "Comedy", "Thriller", "Action", "Romance"]
+seaborn.violinplot(x="genres", y="revenue", data=revenue_and_genres, ax=ax)
+plt.show()
 

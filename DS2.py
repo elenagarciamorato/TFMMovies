@@ -91,8 +91,9 @@ for i in df2.columns:
 
 # Drop columns with a high number of unique values -> 'id'(44014), 'imdb_id'(44014), 'original_title' (42000),
 # 'overview'(43851), 'poster_path'(43989), 'title'(40938)
-# (despite their high level of unique values, we keep original-title as "key" value of each film)
-columns_unique_values = ['id', 'imdb_id', 'overview', 'poster_path', 'title']
+# (despite their high level of unique values, we keep id as key value of each film
+# and original-title to identify them in inequivocous way)
+columns_unique_values = ['imdb_id', 'overview', 'poster_path', 'title']
 df2 = df2.drop(columns=columns_unique_values)
 
 
@@ -115,10 +116,16 @@ runtime_masked = df2['runtime'].mask(condition, np.nan)
 df2 = df2.drop('runtime', axis=1)
 df2 = df2.assign(runtime=runtime_masked)
 
+# Again, we evaluate null values
+with ProgressBar():
+    missing_count_pct = ((df2.isnull().sum() / df2.index.size) * 100).compute()
+print(missing_count_pct)
+#print(df.head())
+
 # Furthermore, on runtime we infer the value based on the median
-#median = (df2['runtime'].quantile(0.5)).compute()
-#print(" The median is: " + str(median))
-#df2 = df2.fillna({'runtime': float(median)})
+median = (df2['runtime'].quantile(0.5)).compute()
+print(" The median is: " + str(median))
+df2 = df2.fillna({'runtime': float(median)})
 
 
 # OTHER
@@ -128,10 +135,11 @@ budget_parsed = df2['budget'].apply(lambda x: to_float(x), meta=np.float)
 df2 = df2.drop(columns=['budget'])
 df2 = df2.assign(budget=budget_parsed)
 
-# Parse object into date -> release_date
-release_date_parsed = df2['release_date'].apply(lambda x: datetime.strptime(x, "%Y-%m-%d"), meta=datetime)
+# Parse object into date and keep only the year-> release_date
+release_year = df2['release_date'].apply(lambda x: datetime.strptime(x, "%Y-%m-%d").year, meta=datetime)
 df2 = df2.drop(columns=['release_date'])
-df2 = df2.assign(release_date=release_date_parsed)
+df2 = df2.assign(release_year=release_year)
+print(df2['release_year'].head())
 
 
 # Reduce the number of different values (89) by putting unique entries (16) in a category called other -> original language
@@ -185,7 +193,7 @@ df2 = df2.drop(columns=['belongs_to_collection'])
 df2 = df2.assign(belongs_to_collection=belongs_to_collection_parsed)
 
 # Resume of cleaning data process
-print("DataFrame columns: ")  # 14 (antes 24)
+print("DataFrame columns: ")  # 15 (antes 24)
 print(df2.columns)
 print("DataFrame rows (number of): " + str(len(df2.index)))  #43706 (antes 45466)
 
@@ -231,8 +239,13 @@ print("\nBELONGS TO COLLECTION: ")
 print(df2['belongs_to_collection'].describe().compute())
 
 # Date type columns: release_date
+print("\nRELEASE YEAR: ")
+print(df2['release_year'].describe().compute())
 
 # Bool object column: adult
+print("\nADULT: ")
+print(df2['adult'].describe().compute())
+
 
 # JSON object columns: genres, spoken_languages, production_companies, production_countries
 
