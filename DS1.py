@@ -7,8 +7,10 @@
 import os
 
 from functions import *
+from querys import *
 import dask.dataframe as dd
 import numpy as np
+import pandas as pd
 from dask.diagnostics import ProgressBar
 from dask.array import stats as dask_stats
 from matplotlib import pyplot as plt
@@ -28,7 +30,7 @@ dtype_scheme ={'budget': np.float64, 'genres': np.object, 'homepage': np.str, 'i
 os.chdir('/Users/elenagarciamorato/Desktop/TFM')
 
 df = dd.read_csv('tmdb_5000_movies.csv', dtype=dtype_scheme)
-#df = df.set_index('original_title')
+#df = df.set_index('id')
 print(df)
 
 ######## DATA CLEANING #########
@@ -48,29 +50,23 @@ missing_count = ((missing_values / df.index.size) * 100)
 with ProgressBar():
     missing_count_pct = missing_count.compute()
 print(missing_count_pct)
-#print(df.head())
 
-# Drop not relevant columns and with high number of null values (+50%) -> homepage
+# Drop columns with high number of null values (+50%) -> homepage
 columns_to_drop = list(missing_count_pct[missing_count_pct >= 50].index)
 df = df.drop(columns_to_drop, axis=1)
-
-# Fill missed values with a default one (between 5% and 50% null values)
-#df = df.fillna({'release_date': 'Dismissed', 'runtime': 'Dismissed'})
 
 # Discard rows with missing values (just in case null values were a very low number (<5%)) -> release_date, runtime, overview
 rows_to_drop = list(missing_count_pct[(missing_count_pct > 0) & (missing_count_pct < 5)].index)
 df = df.dropna(subset=rows_to_drop)
 
 
-# EVALUATING VALUES
+# EVALUATING COLUMN VALUES
 
 # values count
-for i in (['budget', 'genres', 'id', 'keywords', 'original_language', 'original_title',
-           'overview', 'popularity', 'production_companies', 'production_countries',
-           'release_date', 'revenue', 'runtime', 'spoken_languages', 'status', 'tagline',
-           'title', 'vote_average', 'vote_count']):
+for i in df.columns:
     values = df[i].value_counts().compute()
     print(values)
+
 
 # Unique Values
 
@@ -80,47 +76,10 @@ for i in (['budget', 'genres', 'id', 'keywords', 'original_language', 'original_
 df = df.drop(columns=['tagline', 'overview', 'title', 'keywords'])
 
 
-# Odd Values
+# Other Values
 
-
-# Value 0 in columns 'budget', 'revenue' and 'runtime' doesn't mean anything but missed values
-# To fix it, on budget, revenue and runtime (int64) we set the 0 values as NaN
-condition = df['budget'] == 0
-budget_masked = df['budget'].mask(condition, np.nan)
-df = df.drop('budget', axis=1)
-df = df.assign(budget=budget_masked)
-
-condition = df['revenue'] == 0
-revenue_masked = df['revenue'].mask(condition, np.nan)
-df = df.drop('revenue', axis=1)
-df = df.assign(revenue=revenue_masked)
-
-condition = df['runtime'] == 0
-runtime_masked = df['runtime'].mask(condition, np.nan)
-df = df.drop('runtime', axis=1)
-df = df.assign(runtime=runtime_masked)
-
-# Again, we evaluate null values
-with ProgressBar():
-    missing_count_pct = ((df.isnull().sum() / df.index.size) * 100).compute()
-print(missing_count_pct)
-
-# Furthermore, on runtime we infer the value based on the median
-median = (df['runtime'].quantile(0.5)).compute()
-print(" The median is: " + str(median))
-df = df.fillna({'runtime': float(median)})
-
-# Furthermore, on runtime we infer the value based on the neighbor method
-# Imputed values only based in ['budget', 'popularity', 'revenue', 'runtime', 'vote average', 'vote count']
-#df_aux = df.drop(columns=['genres', 'spoken_languages', 'production_companies', 'production_countries', 'original_title', 'original_language', 'release_date'])
-#imputer = KNNImputer(n_neighbors=5, weights="uniform")
-#df_filled = imputer.fit_transform(df_aux)
-# No es posible imputar valores con KNN, dado que el dtaframe a imputar no puede contener variables no numericas
-# y ademas se devuelve un array
-
-
-
-# OTHER
+# Drop rows whose key value (id) is duplicated (Just in case)
+df = df.drop_duplicates(['id'], keep='first')
 
 # Parse object into date and keep only the year-> release_date
 release_year = df['release_date'].apply(lambda x: datetime.strptime(x, "%Y-%m-%d").year, meta=datetime)
@@ -147,7 +106,56 @@ df = df.drop(columns=['status'])
 df = df.drop(columns=['popularity'])
 
 
-# Convert str/Json columns to tuples -> genres, spoken_languages, production_companies, production_countries
+# Odd Values
+
+# Value 0 in columns 'budget', 'revenue' and 'runtime' doesn't mean anything but missed values
+# To fix it, on budget, revenue and runtime (int64) we set the 0 values as NaN
+condition = df['budget'] == 0
+budget_masked = df['budget'].mask(condition, np.nan)
+df = df.drop('budget', axis=1)
+df = df.assign(budget=budget_masked)
+
+condition = df['revenue'] == 0
+revenue_masked = df['revenue'].mask(condition, np.nan)
+df = df.drop('revenue', axis=1)
+df = df.assign(revenue=revenue_masked)
+
+condition = df['runtime'] == 0
+runtime_masked = df['runtime'].mask(condition, np.nan)
+df = df.drop('runtime', axis=1)
+df = df.assign(runtime=runtime_masked)
+
+
+# Again, we evaluate null values
+with ProgressBar():
+    missing_count_pct = ((df.isnull().sum() / df.index.size) * 100).compute()
+print(missing_count_pct)
+
+# And just as before, we drop columns with high number of missed values
+#columns_to_drop = list(missing_count_pct[missing_count_pct >= 50].index)
+#df = df.drop(columns_to_drop, axis=1)
+
+
+# Furthermore, on Runtime column (0.7% missed values) we infer the value based on the neighbor method (KNN)
+# Imputed values only based in numeric entries ['budget', id, 'revenue', 'runtime', 'vote average', 'vote count', 'release_year']
+df_aux = df.drop(columns=['genres', 'spoken_languages', 'production_companies', 'production_countries', 'original_title', 'original_language'])
+
+imputer = KNNImputer(n_neighbors=5, weights="uniform", copy=True)
+df_aux = pd.DataFrame(imputer.fit_transform(df_aux), columns=df_aux.columns, index=df_aux['id'])
+# df_aux = dd.from_pandas(df_aux, npartitions=df.npartitions)
+
+df = df.set_index('id')
+df = df.assign(runtime=df_aux['runtime'])
+df = df.reset_index()
+
+# Furthermore, on runtime we infer the value based on the median
+# median = (df['runtime'].quantile(0.5)).compute()
+# print(" The median is: " + str(median))
+# df = df.fillna({'runtime': float(median)})
+
+
+
+# CONVERT STR/JSON OBJECTS TO TUPLES -> genres, spoken_languages, production_companies, production_countries
 
 # genres
 genres_parsed = df['genres'].apply(lambda x: get_list(x, 'name'), meta=object)
@@ -169,7 +177,9 @@ production_countries_parsed = df['production_countries'].apply(lambda x: get_lis
 df = df.drop(columns=['production_countries'])
 df = df.assign(production_countries=production_countries_parsed)
 
-# Resume of cleaning data process
+
+
+# RESUME OF CLEANING DATA PROCESS
 print("DataFrame (new) colums: ")   # 13 (antes 20)
 print(df.columns)
 print("DataFrame rows (new number of): " + str(len(df)))  # 4792 (antes 4803)
@@ -229,4 +239,9 @@ print(df['release_year'].describe().compute())
 
 # SQL QUERYS
 
+query9(df)
+
+#query8(df)
+
+#query3(df)
 
