@@ -38,11 +38,12 @@ def query1(df):
         #plt.xlim(xmin=0)
         #plt.ylim(ymax=1000000000)
         #plt.xlim(xmax=1000000000)
-        plt.show()
+        plt.show(block=False)
+        plt.close()
 
     else:
         print("Correlation coefficient isn't high enough to affirm correlation between budget and revenue variables ("
-              + correlation_matrix.loc['budget', 'revenue']) + ")"
+              + str(correlation_matrix.loc['budget', 'revenue']) + ")")
 
 
 
@@ -75,11 +76,12 @@ def query2(df):
         # plt.xlim(xmin=0)
         # plt.ylim(ymax=1000000000)
         # plt.xlim(xmax=1000000000)
-        plt.show()
+        plt.show(block=False)
+        plt.close()
 
     else:
-        print("Correlation coefficient isn't high enough to affirm correlation between budget and vote_average "
-              "variables (" + correlation_matrix.loc['budget', 'vote_average']) + ")"
+        print("Correlation coefficient isn't high enough to affirm correlation between budget and vote_average variables ("
+              + str(correlation_matrix.loc['budget', 'vote_average']) + ")")
 
 
 # 10 oldest films whose original_language is spanish -> Imp
@@ -98,27 +100,34 @@ def query3(df):
     #seaborn.scatterplot(data=count_per_year.compute())
     #seaborn.histplot(count_per_year.index)
     seaborn.displot(data=count_per_year, x=count_per_year.index)
-    plt.show()
+    plt.show(block=False)
+    plt.close()
 
 
-# 10 Most voted films with higher vote_average -> IMP
+# 10 films with higher vote_average within 200 the most voted films -> IMP
 def query4(df):
-    query = df.nlargest(10, ['vote_count', 'vote_average'])
-    print(str(query[['vote_count', 'vote_average', 'original_title']].head(10)))
+    # Print a list that contains the 10 films with higher vote_average within 200 the most voted films
+    query = df.nlargest(200, 'vote_average').nlargest(10, 'vote_count')
+    print(str(query[['vote_average', 'vote_count', 'original_title']].head(10)))
     #query1 = df.nlargest(45000, 'vote_average').nsmallest(15, 'budget')
     #query3 = df.nsmallest(45000, 'vote_average')
 
 
 # 15 Films with lowest vote_average within the 200 most voted films
 def query5(df):
-    query = df.nlargest(200, 'vote_count').nsmallest(15, 'vote_average')
-    print(str(query[['vote_count', 'vote_average', 'original_title']].head(15)))
+    # Print a list that contains the 10 films with lowest vote_average within the 200 most voted films
+    query = df.nsmallest(200, 'vote_average').nlargest(10, 'vote_count')
+    print(str(query[['vote_count', 'vote_average', 'original_title']].head(10)))
 
 
-# 5 Most popular genres
+# 5 Most popular film genres
 def query6(df):
 
+    # Map elements contained in 'genres' to rows,
+    # so that there will be as many rows for each film as genres associated to it
     query = df.explode('genres')
+
+    # Count how many movies are associated with each genre and select the 5 most numerous
     query = query.groupby('genres')
     count_per_genre = query['id'].count().compute()
     query = count_per_genre.nlargest(5)
@@ -147,7 +156,8 @@ def query7(df):
     f, ax = plt.subplots(figsize=(10, 10))
     seaborn.despine(f, left=True, bottom=True)
     seaborn.violinplot(x="genres", y="release_year", data=ages_and_genres, ax=ax)
-    plt.show()
+    plt.show(block=False)
+    plt.close()
 
 
 # Films by revenue/genre
@@ -169,7 +179,8 @@ def query8(df):
     f, ax = plt.subplots(figsize=(10, 10))
     seaborn.despine(f, left=True, bottom=True)
     seaborn.violinplot(x="genres", y="revenue", data=revenue_and_genres, ax=ax)
-    plt.show()
+    plt.show(block=False)
+    plt.close()
 
 
 # Films by vote_average/genre (percentage of) ->Imp
@@ -207,10 +218,11 @@ def query9(df):
     seaborn.set(style="whitegrid")
     f, ax = plt.subplots(figsize=(10, 10))
     seaborn.despine(f, left=True, bottom=True)
-    seaborn.heatmap(heatmap_data_pct, ax=ax, cmap='Blues', annot=True, linewidths=1)
+    seaborn.heatmap(heatmap_data_pct, ax=ax, cmap='Blues', annot=False, linewidths=1)
     plt.xlabel("Film Genre")
     plt.ylabel("Vote Average")
-    plt.show()
+    plt.show(block=False)
+    plt.close()
 
 
 

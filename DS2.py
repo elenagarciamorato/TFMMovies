@@ -17,6 +17,7 @@ from matplotlib import pyplot as plt
 from datetime import datetime
 import seaborn
 from sklearn.impute import KNNImputer
+import timeit
 
 
 # Datatype scheme
@@ -274,9 +275,21 @@ print(df2['adult'].describe().compute())
 
 # SQL QUERYS
 
-query1(df2)
+#query1(df2)
 
-#query8(df)
+#query2(df2)
+
+#query3(df2)
+
+#query4(df2)
+
+#query5(df2)
+
+#query7(df2)
+
+#query8(df2)
+
+#query9(df2)
 
 
 

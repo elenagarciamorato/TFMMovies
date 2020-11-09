@@ -17,6 +17,7 @@ from matplotlib import pyplot as plt
 from datetime import datetime
 import seaborn
 from sklearn.impute import KNNImputer
+import timeit
 
 
 # Datatype scheme
@@ -239,9 +240,24 @@ print(df['release_year'].describe().compute())
 
 # SQL QUERYS
 
-query9(df)
+runtimes = []
+n_querys = (1, 2, 3, 4, 5, 7, 8, 9)
 
-#query8(df)
+for i in n_querys:
 
-#query3(df)
+    stmt_ = 'query{n:.0f}(df)'.format(n=i)
+    setup_ = '''
+from querys import query{n:.0f}
+from __main__ import df'''.format(n=i)
+
+    time = timeit.timeit(stmt=stmt_, setup=setup_, number=10)
+    time_average = time / 10
+
+    runtimes.append(float(time_average))
+    #print(time_average)
+
+seaborn.barplot(y=np.array(runtimes), x=np.array(n_querys), palette='Blues')
+plt.xlabel("Query")
+plt.ylabel("Seconds")
+plt.show()
 
