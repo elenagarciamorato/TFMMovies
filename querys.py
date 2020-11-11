@@ -38,8 +38,7 @@ def query1(df):
         #plt.xlim(xmin=0)
         #plt.ylim(ymax=1000000000)
         #plt.xlim(xmax=1000000000)
-        plt.show(block=False)
-        plt.close()
+        #plt.show(block=False)
 
     else:
         print("Correlation coefficient isn't high enough to affirm correlation between budget and revenue variables ("
@@ -63,7 +62,7 @@ def query2(df):
 
     if correlation_matrix.loc['budget', 'vote_average'] >= 0.5:
 
-        # Represents correlation using a linear regression model (regplot)
+        # Represents correlation using a quadratic regression model (regplot)
         seaborn.set(style="whitegrid")
         f, ax = plt.subplots(figsize=(10, 10))
         seaborn.despine(f, left=True, bottom=True)
@@ -76,8 +75,7 @@ def query2(df):
         # plt.xlim(xmin=0)
         # plt.ylim(ymax=1000000000)
         # plt.xlim(xmax=1000000000)
-        plt.show(block=False)
-        plt.close()
+        #plt.show(block=False)
 
     else:
         print("Correlation coefficient isn't high enough to affirm correlation between budget and vote_average variables ("
@@ -90,7 +88,7 @@ def query3(df):
     query = df[df.original_language == 'es'].nsmallest(10, 'release_year')
     print(str(query[['release_year', 'original_title']].head(10)))
 
-    # Represents released films whose original level is spanish across time using a distribution plot (displot)
+    # Represents released films whose original language is spanish across time using a distribution plot (displot)
     query = df[df.original_language == 'es'].groupby('release_year')
     count_per_year = query['id'].count().compute()
 
@@ -99,15 +97,15 @@ def query3(df):
     #seaborn.despine(f, left=True, bottom=True)
     #seaborn.scatterplot(data=count_per_year.compute())
     #seaborn.histplot(count_per_year.index)
-    seaborn.displot(data=count_per_year, x=count_per_year.index)
-    plt.show(block=False)
-    plt.close()
+    seaborn.displot(data=count_per_year, x=count_per_year.index, binwidth=5)
+    #plt.show(block=False)
+    #plt.close()
 
 
 # 10 films with higher vote_average within 200 the most voted films -> IMP
 def query4(df):
     # Print a list that contains the 10 films with higher vote_average within 200 the most voted films
-    query = df.nlargest(200, 'vote_average').nlargest(10, 'vote_count')
+    query = df.nlargest(200, 'vote_count').nlargest(10, 'vote_average')
     print(str(query[['vote_average', 'vote_count', 'original_title']].head(10)))
     #query1 = df.nlargest(45000, 'vote_average').nsmallest(15, 'budget')
     #query3 = df.nsmallest(45000, 'vote_average')
@@ -116,7 +114,7 @@ def query4(df):
 # 15 Films with lowest vote_average within the 200 most voted films
 def query5(df):
     # Print a list that contains the 10 films with lowest vote_average within the 200 most voted films
-    query = df.nsmallest(200, 'vote_average').nlargest(10, 'vote_count')
+    query = df.nlargest(200, 'vote_count').nsmallest(10, 'vote_average')
     print(str(query[['vote_count', 'vote_average', 'original_title']].head(10)))
 
 
@@ -143,7 +141,9 @@ def query7(df):
     # Take films (rows) whose genres include at least one of the 5 most popular (Drama, Comedy, Thriller, Action, Romance)
     query = df.explode('genres')
     # row_filter = query6['genres'].isin(['Drama', 'Comedy', 'Thriller', 'Action', 'Romance'])
-    row_filter = query['genres'].isin(query6(df))
+    pop_genres = query6(df)
+    pop_genres.sort()
+    row_filter = query['genres'].isin(pop_genres)
 
     # Take only the columns 'release_year', 'genres'
     column_filter = ['release_year', 'genres']
@@ -155,9 +155,8 @@ def query7(df):
     seaborn.set(style="whitegrid")
     f, ax = plt.subplots(figsize=(10, 10))
     seaborn.despine(f, left=True, bottom=True)
-    seaborn.violinplot(x="genres", y="release_year", data=ages_and_genres, ax=ax)
-    plt.show(block=False)
-    plt.close()
+    seaborn.violinplot(x="genres", y="release_year", data=ages_and_genres, ax=ax, order=pop_genres)
+    #plt.show(block=False)
 
 
 # Films by revenue/genre
@@ -166,7 +165,9 @@ def query8(df):
     # Take films (rows) whose genres include at least one of the 5 most popular (Drama, Comedy, Thriller, Action, Romance)
     query = df.explode('genres')
     # row_filter = query6['genres'].isin(['Drama', 'Comedy', 'Thriller', 'Action', 'Romance'])
-    row_filter = query['genres'].isin(query6(df))
+    pop_genres = query6(df)
+    pop_genres.sort()
+    row_filter = query['genres'].isin(pop_genres)
 
     # Take only the columns 'revenue', 'genres'
     column_filter = ['revenue', 'genres']
@@ -178,9 +179,8 @@ def query8(df):
     seaborn.set(style="whitegrid")
     f, ax = plt.subplots(figsize=(10, 10))
     seaborn.despine(f, left=True, bottom=True)
-    seaborn.violinplot(x="genres", y="revenue", data=revenue_and_genres, ax=ax)
-    plt.show(block=False)
-    plt.close()
+    seaborn.violinplot(x="genres", y="revenue", data=revenue_and_genres, ax=ax, order=pop_genres)
+    #plt.show(block=False)
 
 
 # Films by vote_average/genre (percentage of) ->Imp
@@ -221,8 +221,7 @@ def query9(df):
     seaborn.heatmap(heatmap_data_pct, ax=ax, cmap='Blues', annot=False, linewidths=1)
     plt.xlabel("Film Genre")
     plt.ylabel("Vote Average")
-    plt.show(block=False)
-    plt.close()
+    #plt.show(block=False)
 
 
 

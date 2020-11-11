@@ -275,21 +275,30 @@ print(df2['adult'].describe().compute())
 
 # SQL QUERYS
 
-#query1(df2)
+runtimes = []
+n_querys = (1, 2, 3, 4, 5, 7, 8, 9)
 
-#query2(df2)
+for i in n_querys:
 
-#query3(df2)
+    stmt_ = 'query{n:.0f}(df2)'.format(n=i)
+    setup_ = '''
+from querys import query{n:.0f}
+from __main__ import df2'''.format(n=i)
 
-#query4(df2)
+    time = timeit.timeit(stmt=stmt_, setup=setup_, number=10)
+    time_average = time / 10
 
-#query5(df2)
+    runtimes.append(float(time_average))
+    #print(time_average)
 
-#query7(df2)
+seaborn.set(style="whitegrid")
+f, ax = plt.subplots(figsize=(10, 10))
+seaborn.despine(f, left=True, bottom=True)
 
-#query8(df2)
-
-#query9(df2)
+seaborn.barplot(y=np.array(runtimes), x=np.array(n_querys), palette='Blues')
+plt.xlabel("Query")
+plt.ylabel("Seconds")
+plt.show()
 
 
 

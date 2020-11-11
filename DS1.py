@@ -256,8 +256,49 @@ from __main__ import df'''.format(n=i)
     runtimes.append(float(time_average))
     #print(time_average)
 
+seaborn.set(style="whitegrid")
+f, ax = plt.subplots(figsize=(10, 10))
+seaborn.despine(f, left=True, bottom=True)
+
 seaborn.barplot(y=np.array(runtimes), x=np.array(n_querys), palette='Blues')
 plt.xlabel("Query")
 plt.ylabel("Seconds")
 plt.show()
 
+# Missing at random
+'''
+# Column budget
+null_df = df[df.budget.isnull()].compute()
+notnull_df = df[df.budget.isnull() == False].compute()
+
+# original_language
+seaborn.set(style="whitegrid")
+f, ax= plt.subplots(3,2)
+seaborn.despine(f, left=True, bottom=True)
+
+seaborn.countplot(data=null_df, x='original_language', ax=ax[0,0])
+seaborn.countplot(data=notnull_df, x='original_language', ax=ax[0,1])
+
+plt.show()
+
+# Numerical variables
+
+seaborn.set(style="whitegrid")
+f, ax= plt.subplots(3,2)
+seaborn.despine(f, left=True, bottom=True)
+
+numerical_v = ['vote_average', 'vote_count', 'release_year', 'revenue', 'runtime']
+# vote_average
+
+seaborn.distplot(null_df['vote_average'], ax=ax[1,0])
+seaborn.distplot(notnull_df['vote_average'], ax=ax[1,1])
+
+
+# release_year
+
+seaborn.distplot(null_df['release_year'], ax=ax[2,0])
+seaborn.distplot(notnull_df['release_year'], ax=ax[2,1])
+
+plt.show()
+
+'''
