@@ -2,7 +2,7 @@
 # Elena Garcia-Morato Piñan
 # MASTER EN INGENIERÍA EN SISTEMAS DE DECISIÓN
 # UNIVERSIDAD REY JUAN CARLOS
-# CURSO 2019/2020
+# CURSO 2020/2021
 
 import os
 
@@ -137,55 +137,6 @@ df2 = df2.drop(columns=['popularity'])
 df2 = df2.drop(columns=['video'])
 
 
-# Odd Values
-
-# Value 0 in columns 'budget', 'revenue' and 'runtime' doesn't mean anything but missed values
-# To fix it, on budget, revenue and runtime (int64) we set the 0 values as NaN
-condition = df2['budget'] == 0
-budget_masked = df2['budget'].mask(condition, np.nan)
-df2 = df2.drop('budget', axis=1)
-df2 = df2.assign(budget=budget_masked)
-
-condition = df2['revenue'] == 0
-revenue_masked = df2['revenue'].mask(condition, np.nan)
-df2 = df2.drop('revenue', axis=1)
-df2 = df2.assign(revenue=revenue_masked)
-
-condition = df2['runtime'] == 0
-runtime_masked = df2['runtime'].mask(condition, np.nan)
-df2 = df2.drop('runtime', axis=1)
-df2 = df2.assign(runtime=runtime_masked)
-
-# Again, we evaluate null values
-with ProgressBar():
-    missing_count_pct = ((df2.isnull().sum() / df2.index.size) * 100).compute()
-print(missing_count_pct)
-
-# And just as before, we drop columns with high number of missed values
-#columns_to_drop = list(missing_count_pct[missing_count_pct >= 50].index)
-#columns_to_drop.remove('belongs_to_collection')
-#df2 = df2.drop(columns_to_drop, axis=1)
-
-# Furthermore, on Runtime column (2,32% missed values) we infer the value based on the neighbor method (KNN)
-# Imputed values only based in numeric entries ['budget', id, 'revenue', 'runtime', 'vote average', 'vote count', 'release_year']
-df2_aux = df2.drop(columns=['genres', 'spoken_languages', 'production_companies', 'production_countries',
-                            'original_title', 'original_language', 'belongs_to_collection', 'adult'])
-
-imputer = KNNImputer(n_neighbors=5, weights="uniform", copy=True)
-df2_aux = pd.DataFrame(imputer.fit_transform(df2_aux), columns=df2_aux.columns, index=df2_aux['id'])
-# df2_aux = dd.from_pandas(df2_aux, npartitions=df2.npartitions)
-
-df2 = df2.set_index('id')
-df2 = df2.assign(runtime=df2_aux['runtime'])
-df2 = df2.reset_index()
-
-# Furthermore, on runtime we infer the value based on the median
-#median = (df2['runtime'].quantile(0.5)).compute()
-#print(" The median is: " + str(median))
-#df2 = df2.fillna({'runtime': float(median)})
-
-
-
 # CONVERT STR/JSON OBJECTS TO TUPLES-> genres, spoken_languages, production_companies, production_countries,
 # belongs_to_collection
 
@@ -215,6 +166,50 @@ df2 = df2.drop(columns=['belongs_to_collection'])
 df2 = df2.assign(belongs_to_collection=belongs_to_collection_parsed)
 
 
+# Odd Values
+
+# Value 0 in columns 'budget', 'revenue' and 'runtime' doesn't mean anything but missed values
+# To fix it, on budget, revenue and runtime (int64) we set the 0 values as NaN
+condition = df2['budget'] == 0
+budget_masked = df2['budget'].mask(condition, np.nan)
+df2 = df2.drop('budget', axis=1)
+df2 = df2.assign(budget=budget_masked)
+
+condition = df2['revenue'] == 0
+revenue_masked = df2['revenue'].mask(condition, np.nan)
+df2 = df2.drop('revenue', axis=1)
+df2 = df2.assign(revenue=revenue_masked)
+
+condition = df2['runtime'] == 0
+runtime_masked = df2['runtime'].mask(condition, np.nan)
+df2 = df2.drop('runtime', axis=1)
+df2 = df2.assign(runtime=runtime_masked)
+
+# Again, we evaluate null values
+with ProgressBar():
+    missing_count_pct = ((df2.isnull().sum() / df2.index.size) * 100).compute()
+print(missing_count_pct)
+
+# On Runtime column (2,32% missed values) we infer the value based on the neighbor method (KNN)
+# Imputed values only based in numeric entries ['budget', id, 'revenue', 'runtime', 'vote average', 'vote count', 'release_year']
+df2_aux = df2.drop(columns=['genres', 'spoken_languages', 'production_companies', 'production_countries',
+                            'original_title', 'original_language', 'belongs_to_collection', 'adult'])
+
+imputer = KNNImputer(n_neighbors=5, weights="uniform", copy=True)
+df2_aux = pd.DataFrame(imputer.fit_transform(df2_aux), columns=df2_aux.columns, index=df2_aux['id'])
+# df2_aux = dd.from_pandas(df2_aux, npartitions=df2.npartitions)
+
+df2 = df2.set_index('id')
+df2 = df2.assign(runtime=df2_aux['runtime'])
+df2 = df2.reset_index()
+
+# Furthermore, on runtime we infer the value based on the median
+#median = (df2['runtime'].quantile(0.5)).compute()
+#print(" The median is: " + str(median))
+#df2 = df2.fillna({'runtime': float(median)})
+
+# Furthermore, we found a high number of missing values on budget and revenue, so we test if these are missing values at random
+missing_at_random_test(df2, ['budget', 'revenue'])
 
 # RESUME OF CLEANING DATA PROCESS
 print("DataFrame columns: ")  # 15 (antes 24)
@@ -274,31 +269,31 @@ print(df2['adult'].describe().compute())
 """
 
 # SQL QUERYS
-
-runtimes = []
-n_querys = (1, 2, 3, 4, 5, 7, 8, 9)
-
-for i in n_querys:
-
-    stmt_ = 'query{n:.0f}(df2)'.format(n=i)
-    setup_ = '''
-from querys import query{n:.0f}
-from __main__ import df2'''.format(n=i)
-
-    time = timeit.timeit(stmt=stmt_, setup=setup_, number=10)
-    time_average = time / 10
-
-    runtimes.append(float(time_average))
-    #print(time_average)
-
-seaborn.set(style="whitegrid")
-f, ax = plt.subplots(figsize=(10, 10))
-seaborn.despine(f, left=True, bottom=True)
-
-seaborn.barplot(y=np.array(runtimes), x=np.array(n_querys), palette='Blues')
-plt.xlabel("Query")
-plt.ylabel("Seconds")
-plt.show()
+#
+# runtimes = []
+# n_querys = (1, 2, 3, 4, 5, 7, 8, 9)
+#
+# for i in n_querys:
+#
+#     stmt_ = 'query{n:.0f}(df2)'.format(n=i)
+#     setup_ = '''
+# from querys import query{n:.0f}
+# from __main__ import df2'''.format(n=i)
+#
+#     time = timeit.timeit(stmt=stmt_, setup=setup_, number=10)
+#     time_average = time / 10
+#
+#     runtimes.append(float(time_average))
+#     #print(time_average)
+#
+# seaborn.set(style="whitegrid")
+# f, ax = plt.subplots(figsize=(10, 10))
+# seaborn.despine(f, left=True, bottom=True)
+#
+# seaborn.barplot(y=np.array(runtimes), x=np.array(n_querys), palette='Blues')
+# plt.xlabel("Query")
+# plt.ylabel("Seconds")
+# plt.show()
 
 
 

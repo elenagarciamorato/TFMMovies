@@ -2,7 +2,7 @@
 # Elena Garcia-Morato Piñan
 # MASTER EN INGENIERÍA EN SISTEMAS DE DECISIÓN
 # UNIVERSIDAD REY JUAN CARLOS
-# CURSO 2019/2020
+# CURSO 2020/2021
 
 import os
 
@@ -18,6 +18,7 @@ from datetime import datetime
 import seaborn
 from sklearn.impute import KNNImputer
 import timeit
+from scipy.stats import ks_2samp
 
 
 # Datatype scheme
@@ -107,6 +108,29 @@ df = df.drop(columns=['status'])
 df = df.drop(columns=['popularity'])
 
 
+# CONVERT STR/JSON OBJECTS TO TUPLES -> genres, spoken_languages, production_companies, production_countries
+
+# genres
+genres_parsed = df['genres'].apply(lambda x: get_list(x, 'name'), meta=object)
+df = df.drop(columns=['genres'])
+df = df.assign(genres=genres_parsed)
+
+# spoken_languages
+spoken_languages_parsed = df['spoken_languages'].apply(lambda x: get_list(x, 'iso_639_1'), meta=object)
+df = df.drop(columns=['spoken_languages'])
+df = df.assign(spoken_languages=spoken_languages_parsed)
+
+# production_companies
+production_companies_parsed = df['production_companies'].apply(lambda x: get_list(x, 'name'), meta=object)
+df = df.drop(columns=['production_companies'])
+df = df.assign(production_companies=production_companies_parsed)
+
+# production_countries
+production_countries_parsed = df['production_countries'].apply(lambda x: get_list(x, 'name'), meta=object)
+df = df.drop(columns=['production_countries'])
+df = df.assign(production_countries=production_countries_parsed)
+
+
 # Odd Values
 
 # Value 0 in columns 'budget', 'revenue' and 'runtime' doesn't mean anything but missed values
@@ -132,12 +156,7 @@ with ProgressBar():
     missing_count_pct = ((df.isnull().sum() / df.index.size) * 100).compute()
 print(missing_count_pct)
 
-# And just as before, we drop columns with high number of missed values
-#columns_to_drop = list(missing_count_pct[missing_count_pct >= 50].index)
-#df = df.drop(columns_to_drop, axis=1)
-
-
-# Furthermore, on Runtime column (0.7% missed values) we infer the value based on the neighbor method (KNN)
+# On Runtime column (0.7% missed values) we infer the value based on the neighbor method (KNN)
 # Imputed values only based in numeric entries ['budget', id, 'revenue', 'runtime', 'vote average', 'vote count', 'release_year']
 df_aux = df.drop(columns=['genres', 'spoken_languages', 'production_companies', 'production_countries', 'original_title', 'original_language'])
 
@@ -154,29 +173,8 @@ df = df.reset_index()
 # print(" The median is: " + str(median))
 # df = df.fillna({'runtime': float(median)})
 
-
-
-# CONVERT STR/JSON OBJECTS TO TUPLES -> genres, spoken_languages, production_companies, production_countries
-
-# genres
-genres_parsed = df['genres'].apply(lambda x: get_list(x, 'name'), meta=object)
-df = df.drop(columns=['genres'])
-df = df.assign(genres=genres_parsed)
-
-# spoken_languages
-spoken_languages_parsed = df['spoken_languages'].apply(lambda x: get_list(x, 'iso_639_1'), meta=object)
-df = df.drop(columns=['spoken_languages'])
-df = df.assign(spoken_languages=spoken_languages_parsed)
-
-# production_companies
-production_companies_parsed = df['production_companies'].apply(lambda x: get_list(x, 'name'), meta=object)
-df = df.drop(columns=['production_companies'])
-df = df.assign(production_companies=production_companies_parsed)
-
-# production_countries
-production_countries_parsed = df['production_countries'].apply(lambda x: get_list(x, 'name'), meta=object)
-df = df.drop(columns=['production_countries'])
-df = df.assign(production_countries=production_countries_parsed)
+# Furthermore, we found a high number of missing values on budget and revenue, so we test if these are missing values at random
+missing_at_random_test(df, ['budget', 'revenue'])
 
 
 
@@ -239,66 +237,29 @@ print(df['release_year'].describe().compute())
 """
 
 # SQL QUERYS
+#
+# runtimes = []
+# n_querys = (1, 2, 3, 4, 5, 7, 8, 9)
+#
+# for i in n_querys:
+#
+#     stmt_ = 'query{n:.0f}(df)'.format(n=i)
+#     setup_ = '''
+# from querys import query{n:.0f}
+# from __main__ import df'''.format(n=i)
+#
+#     time = timeit.timeit(stmt=stmt_, setup=setup_, number=10)
+#     time_average = time / 10
+#
+#     runtimes.append(float(time_average))
+#     #print(time_average)
+#
+# seaborn.set(style="whitegrid")
+# f, ax = plt.subplots(figsize=(10, 10))
+# seaborn.despine(f, left=True, bottom=True)
+#
+# seaborn.barplot(y=np.array(runtimes), x=np.array(n_querys), palette='Blues')
+# plt.xlabel("Query")
+# plt.ylabel("Seconds")
+# plt.show()
 
-runtimes = []
-n_querys = (1, 2, 3, 4, 5, 7, 8, 9)
-
-for i in n_querys:
-
-    stmt_ = 'query{n:.0f}(df)'.format(n=i)
-    setup_ = '''
-from querys import query{n:.0f}
-from __main__ import df'''.format(n=i)
-
-    time = timeit.timeit(stmt=stmt_, setup=setup_, number=10)
-    time_average = time / 10
-
-    runtimes.append(float(time_average))
-    #print(time_average)
-
-seaborn.set(style="whitegrid")
-f, ax = plt.subplots(figsize=(10, 10))
-seaborn.despine(f, left=True, bottom=True)
-
-seaborn.barplot(y=np.array(runtimes), x=np.array(n_querys), palette='Blues')
-plt.xlabel("Query")
-plt.ylabel("Seconds")
-plt.show()
-
-# Missing at random
-'''
-# Column budget
-null_df = df[df.budget.isnull()].compute()
-notnull_df = df[df.budget.isnull() == False].compute()
-
-# original_language
-seaborn.set(style="whitegrid")
-f, ax= plt.subplots(3,2)
-seaborn.despine(f, left=True, bottom=True)
-
-seaborn.countplot(data=null_df, x='original_language', ax=ax[0,0])
-seaborn.countplot(data=notnull_df, x='original_language', ax=ax[0,1])
-
-plt.show()
-
-# Numerical variables
-
-seaborn.set(style="whitegrid")
-f, ax= plt.subplots(3,2)
-seaborn.despine(f, left=True, bottom=True)
-
-numerical_v = ['vote_average', 'vote_count', 'release_year', 'revenue', 'runtime']
-# vote_average
-
-seaborn.distplot(null_df['vote_average'], ax=ax[1,0])
-seaborn.distplot(notnull_df['vote_average'], ax=ax[1,1])
-
-
-# release_year
-
-seaborn.distplot(null_df['release_year'], ax=ax[2,0])
-seaborn.distplot(notnull_df['release_year'], ax=ax[2,1])
-
-plt.show()
-
-'''
