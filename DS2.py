@@ -49,9 +49,8 @@ print(df2)
 
 ######## DATA CLEANING #########
 # columns and number of rows
-print("DataFrame columns: ")
-print(df2.columns)
-print("DataFrame rows (number of): " + str(len(df2.index)))
+print("DataFrame columns: " + str(df2.columns))
+print("DataFrame rows (number of): " + str(len(df2)))
 
 
 ## NULL VALUES
@@ -85,6 +84,7 @@ df2 = df2.dropna(subset=rows_to_drop)
 # values count
 for i in df2.columns:
     values = df2[i].value_counts().compute()
+    #print(i + " " + str(values.size))
     print(values)
 
 
@@ -96,6 +96,10 @@ for i in df2.columns:
 # and original-title to identify them in inequivocous way)
 columns_unique_values = ['imdb_id', 'overview', 'poster_path', 'title']
 df2 = df2.drop(columns=columns_unique_values)
+
+# Drop the column 'popularity' because doesn't propose relevant information
+# (value calculated every different day by TMBD based on a unknown algorithm)
+df2 = df2.drop(columns=['popularity'])
 
 
 # Other Values
@@ -128,10 +132,6 @@ df2 = df2.assign(original_language=original_language_masked)
 df2 = df2[(df2.status == "Released")]
 df2 = df2.drop(columns=['status'])
 
-# Drop the column 'popularity' because doesn't propose relevant information
-# (value calculated every different day by TMBD based on a unknown algorithm)
-df2 = df2.drop(columns=['popularity'])
-
 # Drop the column 'video' because doesn't propose relevant information, only shows if there is a video
 # linked to a film entry
 df2 = df2.drop(columns=['video'])
@@ -141,22 +141,22 @@ df2 = df2.drop(columns=['video'])
 # belongs_to_collection
 
 # genres
-genres_parsed = df2['genres'].apply(lambda x: get_list(x, 'name'), meta=object)
+genres_parsed = df2['genres'].apply(lambda x: get_values(x, 'name'), meta=object)
 df2 = df2.drop(columns=['genres'])
 df2 = df2.assign(genres=genres_parsed)
 
 # spoken_languages
-spoken_languages_parsed = df2['spoken_languages'].apply(lambda x: get_list(x, 'iso_639_1'), meta=object)
+spoken_languages_parsed = df2['spoken_languages'].apply(lambda x: get_values(x, 'iso_639_1'), meta=object)
 df2 = df2.drop(columns=['spoken_languages'])
 df2 = df2.assign(spoken_languages=spoken_languages_parsed)
 
 # production_companies
-production_companies_parsed = df2['production_companies'].apply(lambda x: get_list(x, 'name'), meta=object)
+production_companies_parsed = df2['production_companies'].apply(lambda x: get_values(x, 'name'), meta=object)
 df2 = df2.drop(columns=['production_companies'])
 df2 = df2.assign(production_companies=production_companies_parsed)
 
 # production_countries
-production_countries_parsed = df2['production_countries'].apply(lambda x: get_list(x, 'name'), meta=object)
+production_countries_parsed = df2['production_countries'].apply(lambda x: get_values(x, 'name'), meta=object)
 df2 = df2.drop(columns=['production_countries'])
 df2 = df2.assign(production_countries=production_countries_parsed)
 
@@ -269,31 +269,33 @@ print(df2['adult'].describe().compute())
 """
 
 # SQL QUERYS
-#
-# runtimes = []
-# n_querys = (1, 2, 3, 4, 5, 7, 8, 9)
-#
-# for i in n_querys:
-#
-#     stmt_ = 'query{n:.0f}(df2)'.format(n=i)
-#     setup_ = '''
-# from querys import query{n:.0f}
-# from __main__ import df2'''.format(n=i)
-#
-#     time = timeit.timeit(stmt=stmt_, setup=setup_, number=10)
-#     time_average = time / 10
-#
-#     runtimes.append(float(time_average))
-#     #print(time_average)
-#
-# seaborn.set(style="whitegrid")
-# f, ax = plt.subplots(figsize=(10, 10))
-# seaborn.despine(f, left=True, bottom=True)
-#
-# seaborn.barplot(y=np.array(runtimes), x=np.array(n_querys), palette='Blues')
-# plt.xlabel("Query")
-# plt.ylabel("Seconds")
-# plt.show()
+
+runtimes = []
+n_querys = (1, 2, 3, 4, 5, 7, 8, 9)
+
+for i in n_querys:
+
+    stmt_ = 'query{n:.0f}(df2)'.format(n=i)
+    setup_ = '''
+from querys import query{n:.0f}
+from __main__ import df2'''.format(n=i)
+
+    time = timeit.timeit(stmt=stmt_, setup=setup_, number=10)
+    time_average = time / 10
+
+    runtimes.append(["Q" + str(i), time_average])
+    #print(time_average)
+
+runtimes = pd.DataFrame(runtimes, columns=['Q', 'time']).sort_values(by=['time'], ascending=False)
+
+seaborn.set(style="whitegrid")
+f, ax = plt.subplots(figsize=(10, 10))
+seaborn.despine(f, left=True, bottom=True)
+
+seaborn.barplot(x=runtimes.Q,  y=runtimes.time, palette='Blues')
+plt.xlabel("Query")
+plt.ylabel("Seconds")
+plt.show()
 
 
 

@@ -21,7 +21,7 @@ from collections import defaultdict
 from scipy.stats import ks_2samp
 
 
-def get_list(x, k):
+def get_values(x, k):
 
     if str(x) == "nan":
         out = "[]"
@@ -43,14 +43,19 @@ def get_list(x, k):
         for i, j in mapping.items():
             x = x.replace(i, j)
 
-        obj = json.loads(x, strict=False)
-        dictionary = defaultdict(list)
-        {dictionary[key].append(sub[key]) for sub in obj for key in sub}
+
+        dict_lst = json.loads(x, strict=False)
+        out = tuple([d[k] for d in dict_lst if k in d])
+
+
+        #dictionary = defaultdict(list)
+        #{dictionary[key].append(sub[key]) for sub in obj for key in sub}
         #print(str(dictionary['name']))
         #print(type(dictionary[k]))
         #out = np.array(dictionary[k])
         #out = da.asarray(out)
-        out = tuple(dictionary[k])
+
+        #out = tuple(dictionary[k])
 
     return out
 
@@ -97,11 +102,9 @@ def ks_twosampletest(a, b, var):
     c = 1.138
 
     if test[0] > c*sqrt((len(a) + len(b)) / (len(a) * len(b))):
-        print("Para la variable " + var + " se rechaza la hipotesis nula que afirma que ambas muestras provienen de la misma distribución")
+        print("For the " + var + " the null hypothesis that both samples come from the same distribution IS rejected")
     else:
-        print(
-            "Para la variable " + var + " NO puede rechazarse la hipotesis nula que afirma que ambas muestras provienen de la misma distribución")
-
+        print("For the " + var + " the null hypothesis that both samples come from the same distribution CAN NOT be rejected")
 
 def missing_at_random_test(df, variables):
     aux = df.explode('genres').explode('spoken_languages').explode('production_countries')
@@ -129,9 +132,9 @@ def missing_at_random_test(df, variables):
             seaborn.countplot(notnull_df[var], ax=ax[i, 1], order=notnull_df[var].value_counts().sort_values().index)
 
             # We use the Kolmogorov–Smirnov test to compare the equality of both distributions (two-sample K–S test).
-            ks_twosampletest(null_df[var].astype(str), notnull_df[var].astype(str), var)
+            #ks_twosampletest(null_df[var].astype(str), notnull_df[var].astype(str), var)
 
-        plt.show()
+        #plt.show()
 
         # Numerical variables
         seaborn.set(style="whitegrid")
@@ -145,13 +148,13 @@ def missing_at_random_test(df, variables):
         for i in range(0, len(numerical_v)):
             var = numerical_v[i]
             # print(str(var))
-            seaborn.distplot(null_df[var], ax=ax[i, 0], axlabel=False)
-            seaborn.distplot(notnull_df[var], ax=ax[i, 1], axlabel=False)
+            seaborn.distplot(null_df[var], ax=ax[i, 0])
+            seaborn.distplot(notnull_df[var], ax=ax[i, 1])
 
             # We use the Kolmogorov–Smirnov test to compare the equality of both distributions (two-sample K–S test).
             ks_twosampletest(null_df[var].astype(str), notnull_df[var].astype(str), var)
 
-        plt.show()
+        #plt.show()
 
 """""
 # Correlation between film's budget and revenue -> Exist correlation

@@ -67,15 +67,16 @@ df = df.dropna(subset=rows_to_drop)
 # values count
 for i in df.columns:
     values = df[i].value_counts().compute()
+    #print(i + " " + str(values.size))
     print(values)
 
 
 # Unique Values
 
-# Drop columns with a high number of unique values -> 'tagline'(3944), 'overview'(4799), 'title'(4797)
+# Drop columns with a high number of unique values -> 'tagline'(3944), 'overview'(4799), 'title'(4797), 'popularity' (4798)
 # and 'keywords' - (4220) (despite their high level of unique values, we keep id as key value of each film
 # and original-title to identify them in inequivocous way)
-df = df.drop(columns=['tagline', 'overview', 'title', 'keywords'])
+df = df.drop(columns=['tagline', 'overview', 'title', 'keywords', 'popularity'])
 
 
 # Other Values
@@ -88,6 +89,7 @@ release_year = df['release_date'].apply(lambda x: datetime.strptime(x, "%Y-%m-%d
 df = df.drop(columns=['release_date'])
 df = df.assign(release_year=release_year)
 print(df['release_year'].head())
+
 
 # Reduce the number of different values (37) by putting unique entries (14) in a category called other -> original language
 count_original_languages = df['original_language'].value_counts().compute()
@@ -103,30 +105,26 @@ df = df.assign(original_language=original_language_masked)
 df = df[(df.status == "Released")]
 df = df.drop(columns=['status'])
 
-# Drop the column 'popularity' because doesn't propose relevant information
-# (value calculated every different day by TMBD based on a unknown algorithm)
-df = df.drop(columns=['popularity'])
-
 
 # CONVERT STR/JSON OBJECTS TO TUPLES -> genres, spoken_languages, production_companies, production_countries
 
 # genres
-genres_parsed = df['genres'].apply(lambda x: get_list(x, 'name'), meta=object)
+genres_parsed = df['genres'].apply(lambda x: get_values(x, 'name'), meta=object)
 df = df.drop(columns=['genres'])
 df = df.assign(genres=genres_parsed)
 
 # spoken_languages
-spoken_languages_parsed = df['spoken_languages'].apply(lambda x: get_list(x, 'iso_639_1'), meta=object)
+spoken_languages_parsed = df['spoken_languages'].apply(lambda x: get_values(x, 'iso_639_1'), meta=object)
 df = df.drop(columns=['spoken_languages'])
 df = df.assign(spoken_languages=spoken_languages_parsed)
 
 # production_companies
-production_companies_parsed = df['production_companies'].apply(lambda x: get_list(x, 'name'), meta=object)
+production_companies_parsed = df['production_companies'].apply(lambda x: get_values(x, 'name'), meta=object)
 df = df.drop(columns=['production_companies'])
 df = df.assign(production_companies=production_companies_parsed)
 
 # production_countries
-production_countries_parsed = df['production_countries'].apply(lambda x: get_list(x, 'name'), meta=object)
+production_countries_parsed = df['production_countries'].apply(lambda x: get_values(x, 'name'), meta=object)
 df = df.drop(columns=['production_countries'])
 df = df.assign(production_countries=production_countries_parsed)
 
@@ -174,7 +172,7 @@ df = df.reset_index()
 # df = df.fillna({'runtime': float(median)})
 
 # Furthermore, we found a high number of missing values on budget and revenue, so we test if these are missing values at random
-missing_at_random_test(df, ['budget', 'revenue'])
+#missing_at_random_test(df, ['budget', 'revenue'])
 
 
 
@@ -237,29 +235,31 @@ print(df['release_year'].describe().compute())
 """
 
 # SQL QUERYS
-#
-# runtimes = []
-# n_querys = (1, 2, 3, 4, 5, 7, 8, 9)
-#
-# for i in n_querys:
-#
-#     stmt_ = 'query{n:.0f}(df)'.format(n=i)
-#     setup_ = '''
-# from querys import query{n:.0f}
-# from __main__ import df'''.format(n=i)
-#
-#     time = timeit.timeit(stmt=stmt_, setup=setup_, number=10)
-#     time_average = time / 10
-#
-#     runtimes.append(float(time_average))
-#     #print(time_average)
-#
-# seaborn.set(style="whitegrid")
-# f, ax = plt.subplots(figsize=(10, 10))
-# seaborn.despine(f, left=True, bottom=True)
-#
-# seaborn.barplot(y=np.array(runtimes), x=np.array(n_querys), palette='Blues')
-# plt.xlabel("Query")
-# plt.ylabel("Seconds")
-# plt.show()
+
+runtimes = []
+n_querys = (1, 2, 3, 4, 5, 7, 8, 9)
+
+for i in n_querys:
+
+    stmt_ = 'query{n:.0f}(df)'.format(n=i)
+    setup_ = '''
+from querys import query{n:.0f}
+from __main__ import df'''.format(n=i)
+
+    time = timeit.timeit(stmt=stmt_, setup=setup_, number=10)
+    time_average = time / 10
+
+    runtimes.append(["Q" + str(i), time_average])
+    #print(time_average)
+
+runtimes = pd.DataFrame(runtimes, columns=['Q', 'time']).sort_values(by=['time'], ascending=False)
+
+seaborn.set(style="whitegrid")
+f, ax = plt.subplots(figsize=(10, 10))
+seaborn.despine(f, left=True, bottom=True)
+
+seaborn.barplot(x=runtimes.Q,  y=runtimes.time, palette='Blues')
+plt.xlabel("Query")
+plt.ylabel("Seconds")
+plt.show()
 
